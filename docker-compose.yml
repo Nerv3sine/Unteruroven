@@ -3,4 +3,4 @@ services:
     build: .
     restart: unless-stopped
     ports:
-     - "3000:${EXT_PORT}"
+     - "${EXT_PORT}:3000"

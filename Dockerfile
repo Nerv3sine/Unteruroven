@@ -5,8 +5,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-run npm install
-
 COPY . .
 # RUN npm run build
 
