@@ -5,9 +5,6 @@ const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
-const cors = require('cors');
-//make sure to remove the cors package
-
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
