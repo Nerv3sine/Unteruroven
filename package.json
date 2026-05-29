@@ -1,0 +1,22 @@
+{
+  "name": "Unteruroven",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "main": "./server/server.js",
+  "packages": {},
+  "private": true,
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "scripts": {
+    "dev": "nodemon server/server.js",
+    "start": "node server/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.18.2",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
+  }
+}

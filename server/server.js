@@ -1,0 +1,145 @@
+const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
+const { v4: uuidv4 } = require('uuid');
+
+const cors = require('cors');
+//make sure to remove the cors package
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// In-memory storage (no database needed!)
+const games = new Map();
+
+app.use(express.json());
+app.use(express.static('public')); // For frontend files
+
+app.use(cors());
+
+// Create a new game room
+app.post('/create-game', (req, res) => {
+    const roomId = generateRoomCode();
+    console.log("room created")
+    games.set(roomId, {
+        id: roomId,
+        players: new Map(),
+        positions: {}
+    });
+    res.json({ roomId });
+});
+
+// WebSocket connection handling
+wss.on('connection', (ws, req) => {
+    const urlParams = new URL(req.url, `http://${req.headers.host}`);
+    const roomId = urlParams.searchParams.get('roomId');
+    const playerId = urlParams.searchParams.get('playerId');
+    
+    if (!roomId || !playerId) {
+        ws.close();
+        return;
+    }
+    
+    const game = games.get(roomId);
+    if (!game) {
+        ws.send(JSON.stringify({ error: 'Game not found' }));
+        ws.close();
+        return;
+    }
+    
+    // Store player connection
+    game.players.set(playerId, ws);
+    
+    // Initialize position for this player
+    game.positions[playerId] = { x: 0, y: 0 };
+    
+    console.log(`Player ${playerId} joined room ${roomId}`);
+    
+    // Notify other player that someone joined
+    game.players.forEach((_, otherId) => {
+        if (otherId !== playerId) {
+            ws.send(JSON.stringify({ 
+                type: 'opponent_joined', 
+                playerId: otherId 
+            }));
+        }
+    });
+    
+    // Send current game state to new player
+    ws.send(JSON.stringify({
+        type: 'game_state',
+        positions: game.positions
+    }));
+    
+    // Handle incoming messages
+    ws.on('message', (data) => {
+        try {
+            const message = JSON.parse(data);
+            const game = games.get(roomId);
+            
+            if (!game) return;
+            
+            switch (message.type) {
+                case 'position_update':
+                    // Update position in memory (no database!)
+                    game.positions[playerId] = message.position;
+                    
+                    // Broadcast to other player only
+                    for (let [otherId, otherWs] of game.players) {
+                        // if (otherId !== playerId && otherWs.readyState === WebSocket.OPEN) {
+                        if (otherWs.readyState === WebSocket.OPEN) {
+                            otherWs.send(JSON.stringify({
+                                type: 'position_update',
+                                playerId: playerId,
+                                position: message.position
+                            }));
+                        }
+                    }
+                    break;
+                    
+                case 'get_positions':
+                    ws.send(JSON.stringify({
+                        type: 'positions',
+                        positions: game.positions
+                    }));
+                    break;
+            }
+        } catch (err) {
+            console.error('Error parsing message:', err);
+        }
+    });
+    
+    // Handle player disconnect
+    ws.on('close', () => {
+        const game = games.get(roomId);
+        if (game) {
+            game.players.delete(playerId);
+            delete game.positions[playerId];
+            
+            // Notify other player
+            for (let [otherId, otherWs] of game.players) {
+                if (otherWs.readyState === WebSocket.OPEN) {
+                    otherWs.send(JSON.stringify({
+                        type: 'player_disconnected',
+                        playerId: playerId
+                    }));
+                }
+            }
+            
+            // Clean up empty games
+            if (game.players.size === 0) {
+                games.delete(roomId);
+            }
+        }
+        console.log(`Player ${playerId} disconnected`);
+    });
+});
+
+function generateRoomCode() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+server.listen(3000, () => {
+    console.log('Server running on http://localhost:3000');
+});

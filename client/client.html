@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Unteruroven</title>
+        <style>
+            body{
+                overflow-x:hidden;
+            }
+            canvas {
+                border: 1px solid black;
+                background: #f0f0f0;
+                width: 800px;
+                height: 600px;
+            }
+            #roomInfo {
+                margin: 10px;
+                font-family: monospace;
+                visibility: hidden;
+                display: flex;
+            }
+            #rmCode {
+                margin-left: 10px;
+            }
+            #gameDisplay {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 90vh;
+                width: 100vw;
+            }
+            #controls {
+                margin-top: 20px;
+            }
+            #leaveGame {
+                visibility: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="gameDisplay">
+            <div id="roomInfo">
+                <p>Room Code:</p>
+                <p id="rmCode">Code</p>
+            </div>
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <div id="controls">
+                <button onclick="createGame()">Create New Game</button>
+                <input type="text" id="joinCode" placeholder="Enter Room Code">
+                <button onclick="joinGame()">Join Game</button>
+            </div>
+            <button id="leaveGame" onclick="leaveGame()">Leave Game</button>
+        </div>
+
+        <script>
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            let ws = null;
+            let playerId = null;
+            let roomId = null;
+            let positions = {};
+            
+            // Player movement
+            const keys = {};
+            const playerSize = 30;
+            let myPosition = { x: 0, y: 0 };
+            
+            // Colors
+            const colors = {
+                player1: '#FF6B6B',
+                player2: '#4ECDC4'
+            };
+
+            const updateRoomInfoDisplay = (display) => {
+                document.getElementById('rmCode').innerHTML = `<strong>${roomId}</strong>`;
+                document.getElementById('roomInfo').style.visibility = display ? "visible" : "hidden";
+                document.getElementById('controls').style.visibility = display ? "hidden" : "visible";
+                document.getElementById('leaveGame').style.visibility = display ? "visible" : "hidden";
+            }
+            
+            async function createGame() {
+                const response = await fetch('http://localhost:3000/create-game', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                roomId = data.roomId;
+                playerId = 'player_' + Math.random().toString(36).substr(2, 9);
+                updateRoomInfoDisplay(true);
+                connectWebSocket();
+            }
+            
+            async function joinGame() {
+                const joinCode = document.getElementById('joinCode').value.toUpperCase();
+                if (joinCode) {
+                    roomId = joinCode;
+                    playerId = 'player_' + Math.random().toString(36).substr(2, 9);
+                    connectWebSocket();
+                    updateRoomInfoDisplay(true);
+                }
+            }
+
+            function leaveGame() {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.close(1000, "Normal closure");
+                }
+                positions = {}
+                updateRoomInfoDisplay(false);
+            }
+            
+            function connectWebSocket() {
+                ws = new WebSocket(`ws://localhost:3000/ws?roomId=${roomId}&playerId=${playerId}`);
+                
+                ws.onopen = () => {
+                    console.log('Connected to server');
+                    // Start game loop
+                    gameLoop();
+                    // Send position updates every frame
+                    setInterval(sendPosition, 50);
+                };
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    
+                    switch(data.type) {
+                        case 'game_state':
+                            positions = data.positions;
+                            break;
+                        case 'position_update':
+                            positions[data.playerId] = data.position;
+                            break;
+                        case 'opponent_joined':
+                            console.log('Opponent joined!');
+                            break;
+                        case 'player_disconnected':
+                            console.log('Opponent disconnected');
+                            delete positions[data.playerId];
+                            break;
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                };
+            }
+            
+            function sendPosition() {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'position_update',
+                        position: myPosition
+                    }));
+                }
+            }
+            
+            window.addEventListener("load", () => {
+                // Handle keyboard input
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key] = true;
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key] = false;
+                });
+            })
+            
+            function updateMovement() {
+                const speed = 5;
+                if (keys['ArrowUp'] || keys['w']) myPosition.y -= speed;
+                if (keys['ArrowDown'] || keys['s']) myPosition.y += speed;
+                if (keys['ArrowLeft'] || keys['a']) myPosition.x -= speed;
+                if (keys['ArrowRight'] || keys['d']) myPosition.x += speed;
+                
+                // Boundary checking
+                myPosition.x = Math.max(0, Math.min(canvas.width - playerSize, myPosition.x));
+                myPosition.y = Math.max(0, Math.min(canvas.height - playerSize, myPosition.y));
+            }
+            
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw all players
+                for (let id in positions) {
+                    const pos = positions[id];
+                    const isMe = (id === playerId);
+                    const color = isMe ? '#FFD93D' : (id.includes('player_1') ? colors.player1 : colors.player2);
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(pos.x, pos.y, playerSize, playerSize);
+                    
+                    // Add label
+                    ctx.fillStyle = 'black';
+                    ctx.font = '12px Arial';
+                    let posY = pos.y < 15 ? pos.y + 45 : pos.y - 5
+                    ctx.fillText(isMe ? 'You' : 'Opponent', pos.x + 5, posY);
+                }
+            }
+            
+            function gameLoop() {
+                updateMovement();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+
+        </script>
+    </body>
+</html>
