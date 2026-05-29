@@ -140,7 +140,8 @@ function generateRoomCode() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-server.listen(SERVER_PORT, () => {
-    console.log(`Client available at port 3000`);
-    console.log(`Server running on port 3000`); 
+const PORT = 3000
+server.listen(PORT, () => {
+    console.log(`Client available at port ${PORT}`);
+    console.log(`Server running on port ${PORT}`); 
 });
