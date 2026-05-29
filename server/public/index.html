@@ -108,6 +108,7 @@
             }
             
             function connectWebSocket() {
+                console.log(window.host.location)
                 ws = new WebSocket(`ws://${window.host.location}/ws?roomId=${roomId}&playerId=${playerId}`);
                 
                 ws.onopen = () => {
