@@ -1,0 +1,6 @@
+services:
+  server:
+    build: .
+    restart: unless-stopped
+    ports:
+     - "${SERVER_PORT}:${EXT_PORT}"
