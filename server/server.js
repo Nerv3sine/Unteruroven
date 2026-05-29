@@ -1,7 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
 
 const cors = require('cors');
 //make sure to remove the cors package
@@ -10,13 +12,14 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// In-memory storage (no database needed!)
 const games = new Map();
 
 app.use(express.json());
 app.use(express.static('public')); // For frontend files
 
-app.use(cors());
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+})
 
 // Create a new game room
 app.post('/create-game', (req, res) => {
@@ -140,6 +143,9 @@ function generateRoomCode() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-server.listen(3000, () => {
-    console.log('Server running on http://localhost:3000');
+const SERVER_PORT = process.env.SERVER_PORT
+
+server.listen(SERVER_PORT, () => {
+    console.log(`Client available at port http://localhost:${SERVER_PORT}`);
+    console.log(`Server running on port ${SERVER_PORT}`); 
 });
