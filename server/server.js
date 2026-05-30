@@ -24,6 +24,7 @@ app.post('/create-game', (req, res) => {
     games.set(roomId, {
         id: roomId,
         players: new Map(),
+        usernames: {},
         positions: {}
     });
     res.json({ roomId });
@@ -34,6 +35,7 @@ wss.on('connection', (ws, req) => {
     const urlParams = new URL(req.url, `http://${req.headers.host}`);
     const roomId = urlParams.searchParams.get('roomId');
     const playerId = urlParams.searchParams.get('playerId');
+    const playerUser = urlParams.searchParams.get('user');
     
     if (!roomId || !playerId) {
         ws.close();
@@ -50,17 +52,19 @@ wss.on('connection', (ws, req) => {
     // Store player connection
     game.players.set(playerId, ws);
     
-    // Initialize position for this player
+    // Initialize player information
     game.positions[playerId] = { x: 0, y: 0 };
+    game.usernames[playerId] = playerUser;
     
-    console.log(`Player ${playerId} joined room ${roomId}`);
+    console.log(`Player ${playerUser} joined room ${roomId}`);
     
     // Notify other player that someone joined
-    game.players.forEach((_, otherId) => {
+    game.players.forEach((oWs, otherId) => {
         if (otherId !== playerId) {
-            ws.send(JSON.stringify({ 
+            oWs.send(JSON.stringify({ 
                 type: 'opponent_joined', 
-                playerId: otherId 
+                playerId: playerId,
+                user: playerUser
             }));
         }
     });
@@ -68,7 +72,8 @@ wss.on('connection', (ws, req) => {
     // Send current game state to new player
     ws.send(JSON.stringify({
         type: 'game_state',
-        positions: game.positions
+        positions: game.positions,
+        users: game.usernames
     }));
     
     // Handle incoming messages
@@ -81,7 +86,6 @@ wss.on('connection', (ws, req) => {
             
             switch (message.type) {
                 case 'position_update':
-                    // Update position in memory (no database!)
                     game.positions[playerId] = message.position;
                     
                     // Broadcast to other player only
@@ -115,6 +119,7 @@ wss.on('connection', (ws, req) => {
         if (game) {
             game.players.delete(playerId);
             delete game.positions[playerId];
+            delete game.usernames[playerId];
             
             // Notify other player
             for (let [otherId, otherWs] of game.players) {

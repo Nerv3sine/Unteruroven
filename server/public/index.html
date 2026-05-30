@@ -16,17 +16,18 @@
                 height: 600px;
             }
             #roomInfo {
-                margin: 10px;
                 font-family: monospace;
                 visibility: hidden;
                 display: flex;
             }
             #rmCode {
                 margin-left: 10px;
-                padding: 0 !important;
                 border: none;
                 width: 70px;
                 font-weight: 800;
+            }
+            input{
+                padding: 0 !important;
             }
             #rmCode:focus{
                 outline: none;
@@ -53,6 +54,21 @@
                 margin-top: 10px;
                 margin-left: 10px;
             }
+            #username{
+                display: flex;
+                height: fit-content;
+            }
+            #usernameField{
+                margin-left: 10px;
+                margin-bottom: 10px;
+                margin-top: 10px;
+            }
+            .playing{
+                border: none;
+            }
+            .playing:focus{
+                outline: none;
+            }
         </style>
     </head>
     <body>
@@ -61,6 +77,10 @@
                 <p>Room Code:</p>
                 <input id="rmCode" type="text" value="" readonly/>
                 <button id="cpyIcon" onclick="copyRmCode()"><img src="https://unpkg.com/ionicons@7.1.0/dist/svg/copy-outline.svg" width="15px" height="15px"/></button>
+            </div>
+            <div id="username">
+                <p>Username:</p>
+                <input id="usernameField" type="text" value=""/>
             </div>
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div id="controls">
@@ -76,8 +96,10 @@
             const ctx = canvas.getContext('2d');
             let ws = null;
             let playerId = null;
+            let username = "";
             let roomId = null;
             let positions = {};
+            let usernames = {};
             
             // Player movement
             const keys = {};
@@ -95,6 +117,13 @@
                 document.getElementById('roomInfo').style.visibility = display ? "visible" : "hidden";
                 document.getElementById('controls').style.visibility = display ? "hidden" : "visible";
                 document.getElementById('leaveGame').style.visibility = display ? "visible" : "hidden";
+                let userField = document.getElementById('usernameField');
+                userField.readOnly = display;
+                if(display){
+                    userField.classList.add('playing')
+                }else{
+                    userField.classList.remove('playing')
+                }
             }
             
             async function createGame() {
@@ -121,12 +150,13 @@
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.close(1000, "Normal closure");
                 }
-                positions = {}
+                positions = {};
+                usernames = {};
                 updateRoomInfoDisplay(false);
             }
             
             function connectWebSocket() {
-                ws = new WebSocket(`ws://${window.location.host}/ws?roomId=${roomId}&playerId=${playerId}`);
+                ws = new WebSocket(`ws://${window.location.host}/ws?roomId=${roomId}&playerId=${playerId}&user=${username}`);
                 
                 ws.onopen = () => {
                     console.log('Connected to server');
@@ -142,6 +172,7 @@
                     switch(data.type) {
                         case 'game_state':
                             positions = data.positions;
+                            usernames = data.users;
                             updateRoomInfoDisplay(true);
                             break;
                         case 'position_update':
@@ -149,10 +180,12 @@
                             break;
                         case 'opponent_joined':
                             console.log('Opponent joined!');
+                            usernames[data.playerId] = data.user;
                             break;
                         case 'player_disconnected':
                             console.log('Opponent disconnected');
                             delete positions[data.playerId];
+                            delete usernames[data.playerId];
                             break;
                         case 'game_not_found':
                             console.log('game doesn\'t exist');
@@ -184,6 +217,12 @@
                 document.addEventListener('keyup', (e) => {
                     keys[e.key] = false;
                 });
+
+                let userField = document.getElementById('usernameField');
+                userField.value = username;
+                userField.addEventListener('change', (e) => {
+                    username = e.target.value;
+                })
             })
             
             function updateMovement() {
@@ -213,8 +252,8 @@
                     // Add label
                     ctx.fillStyle = 'black';
                     ctx.font = '12px Arial';
-                    let posY = pos.y < 15 ? pos.y + 45 : pos.y - 5
-                    ctx.fillText(isMe ? 'You' : 'Opponent', pos.x + 5, posY);
+                    let posY = pos.y < 15 ? pos.y + 45 : pos.y - 5;
+                    ctx.fillText(isMe ? 'You' : (usernames[id] ?? 'player'), pos.x + 5, posY);
                 }
             }
             
