@@ -92,6 +92,7 @@
         </div>
 
         <script>
+            var animReq = null;
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
             let ws = null;
@@ -104,7 +105,7 @@
             // Player movement
             const keys = {};
             const playerSize = 30;
-            let myPosition = { x: 0, y: 0 };
+            let mVector = { x: 0, y: 0 };
             
             // Colors
             const colors = {
@@ -120,9 +121,10 @@
                 let userField = document.getElementById('usernameField');
                 userField.readOnly = display;
                 if(display){
-                    userField.classList.add('playing')
+                    userField.classList.add('playing');
                 }else{
-                    userField.classList.remove('playing')
+                    userField.classList.remove('playing');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                 }
             }
             
@@ -152,6 +154,9 @@
                 }
                 positions = {};
                 usernames = {};
+                mVector = {x: 0, y: 0};
+                clearInterval(sendPosition);
+                cancelAnimationFrame(animReq);
                 updateRoomInfoDisplay(false);
             }
             
@@ -203,9 +208,10 @@
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: 'position_update',
-                        position: myPosition
+                        vector: mVector
                     }));
                 }
+                mVector = {x: 0, y: 0};
             }
             
             window.addEventListener("load", () => {
@@ -226,15 +232,10 @@
             })
             
             function updateMovement() {
-                const speed = 5;
-                if (keys['ArrowUp'] || keys['w']) myPosition.y -= speed;
-                if (keys['ArrowDown'] || keys['s']) myPosition.y += speed;
-                if (keys['ArrowLeft'] || keys['a']) myPosition.x -= speed;
-                if (keys['ArrowRight'] || keys['d']) myPosition.x += speed;
-                
-                // Boundary checking
-                myPosition.x = Math.max(0, Math.min(canvas.width - playerSize, myPosition.x));
-                myPosition.y = Math.max(0, Math.min(canvas.height - playerSize, myPosition.y));
+                if (keys['ArrowUp'] || keys['w']) mVector.y -= 1;
+                if (keys['ArrowDown'] || keys['s']) mVector.y += 1;
+                if (keys['ArrowLeft'] || keys['a']) mVector.x -= 1;
+                if (keys['ArrowRight'] || keys['d']) mVector.x += 1;
             }
             
             function draw() {
@@ -260,7 +261,7 @@
             function gameLoop() {
                 updateMovement();
                 draw();
-                requestAnimationFrame(gameLoop);
+                animReq = requestAnimationFrame(gameLoop);
             }
 
             function copyRmCode() {

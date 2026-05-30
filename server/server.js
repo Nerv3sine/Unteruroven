@@ -10,6 +10,10 @@ const wss = new WebSocket.Server({ server });
 
 const games = new Map();
 
+const playerSpeed = 5;
+const playerSize = 30;
+const mapSize = {width: 800, height: 600};
+
 app.use(express.json());
 app.use(express.static('public')); // For frontend files
 
@@ -86,7 +90,17 @@ wss.on('connection', (ws, req) => {
             
             switch (message.type) {
                 case 'position_update':
-                    game.positions[playerId] = message.position;
+                    let vec = message.vector;
+                    if(vec.x == 0 && vec.y == 0){
+                        break;
+                    }
+                    let px = vec.x * playerSpeed + game.positions[playerId].x;
+                    let py = vec.y * playerSpeed + game.positions[playerId].y;
+                    // Boundary checking
+                    game.positions[playerId] = {
+                        x: Math.max(0, Math.min(mapSize.width - playerSize, px)),
+                        y: Math.max(0, Math.min(mapSize.height - playerSize, py))
+                    };
                     
                     // Broadcast to other player only
                     for (let [otherId, otherWs] of game.players) {
@@ -95,7 +109,7 @@ wss.on('connection', (ws, req) => {
                             otherWs.send(JSON.stringify({
                                 type: 'position_update',
                                 playerId: playerId,
-                                position: message.position
+                                position: game.positions[playerId]
                             }));
                         }
                     }
