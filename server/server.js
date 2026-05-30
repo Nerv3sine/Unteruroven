@@ -42,7 +42,7 @@ wss.on('connection', (ws, req) => {
     
     const game = games.get(roomId);
     if (!game) {
-        ws.send(JSON.stringify({ error: 'Game not found' }));
+        ws.send(JSON.stringify({ type: 'game_not_found' }));
         ws.close();
         return;
     }

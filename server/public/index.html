@@ -4,7 +4,10 @@
         <title>Unteruroven</title>
         <style>
             body{
-                overflow-x:hidden;
+                overflow: hidden;
+            }
+            button{
+                cursor: pointer;
             }
             canvas {
                 border: 1px solid black;
@@ -20,6 +23,14 @@
             }
             #rmCode {
                 margin-left: 10px;
+                padding: 0 !important;
+                border: none;
+                width: 70px;
+                font-weight: 800;
+            }
+            #rmCode:focus{
+                outline: none;
+                border: none;
             }
             #gameDisplay {
                 display: flex;
@@ -35,18 +46,26 @@
             #leaveGame {
                 visibility: hidden;
             }
+            #cpyIcon{
+                width: 25px;
+                height: 25px;
+                padding: 2.5px;
+                margin-top: 10px;
+                margin-left: 10px;
+            }
         </style>
     </head>
     <body>
         <div id="gameDisplay">
             <div id="roomInfo">
                 <p>Room Code:</p>
-                <p id="rmCode">Code</p>
+                <input id="rmCode" type="text" value="" readonly/>
+                <button id="cpyIcon" onclick="copyRmCode()"><img src="https://unpkg.com/ionicons@7.1.0/dist/svg/copy-outline.svg" width="15px" height="15px"/></button>
             </div>
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div id="controls">
                 <button onclick="createGame()">Create New Game</button>
-                <input type="text" id="joinCode" placeholder="Enter Room Code">
+                <input type="text" id="joinCode" maxlength="6" placeholder="Enter Room Code">
                 <button onclick="joinGame()">Join Game</button>
             </div>
             <button id="leaveGame" onclick="leaveGame()">Leave Game</button>
@@ -72,7 +91,7 @@
             };
 
             const updateRoomInfoDisplay = (display) => {
-                document.getElementById('rmCode').innerHTML = `<strong>${roomId}</strong>`;
+                document.getElementById('rmCode').value = roomId;
                 document.getElementById('roomInfo').style.visibility = display ? "visible" : "hidden";
                 document.getElementById('controls').style.visibility = display ? "hidden" : "visible";
                 document.getElementById('leaveGame').style.visibility = display ? "visible" : "hidden";
@@ -95,7 +114,6 @@
                     roomId = joinCode;
                     playerId = 'player_' + Math.random().toString(36).substr(2, 9);
                     connectWebSocket();
-                    updateRoomInfoDisplay(true);
                 }
             }
 
@@ -124,6 +142,7 @@
                     switch(data.type) {
                         case 'game_state':
                             positions = data.positions;
+                            updateRoomInfoDisplay(true);
                             break;
                         case 'position_update':
                             positions[data.playerId] = data.position;
@@ -135,10 +154,14 @@
                             console.log('Opponent disconnected');
                             delete positions[data.playerId];
                             break;
+                        case 'game_not_found':
+                            console.log('game doesn\'t exist');
+                            break;
                     }
                 };
                 
                 ws.onerror = (error) => {
+                    updateRoomInfoDisplay(false);
                     console.error('WebSocket error:', error);
                 };
             }
@@ -199,6 +222,13 @@
                 updateMovement();
                 draw();
                 requestAnimationFrame(gameLoop);
+            }
+
+            function copyRmCode() {
+                let code = document.getElementById('rmCode')
+                code.select();
+                document.execCommand("copy");
+                code.blur();
             }
 
         </script>
